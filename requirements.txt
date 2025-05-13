@@ -13,4 +13,5 @@ duckduckgo-search>=3.9.0
 pandas>=2.0.0
 scikit-learn>=1.2.0
 markdown>=3.4.0
-watchdog>=3.0.0 
+watchdog>=3.0.0
+google-genai
