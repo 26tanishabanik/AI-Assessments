@@ -1,0 +1,16 @@
+# Core libraries
+python-dotenv
+pillow
+requests
+streamlit
+
+# WhatsApp Integration
+flask
+twilio
+pydub
+
+# Google Cloud Speech-to-Text
+google-cloud-speech
+
+# The official Google Agent Development Kit (ADK)
+google-adk
