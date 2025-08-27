@@ -1,8 +1,10 @@
 # Core libraries
+asgiref
 python-dotenv
 pillow
 requests
 streamlit
+uvicorn[standard]
 
 # WhatsApp Integration
 flask
