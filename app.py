@@ -573,7 +573,7 @@ ASSESSMENT PROCESS:
 
 CRITICAL: Your final message must be the detailed analysis in text format, not just tool calls.
 
-RESPONSE FORMAT: After completing the assessment with tools, provide a detailed analysis in this EXACT format:
+RESPONSE FORMAT: After completing the assessment with tools, provide a detailed analysis in this EXACT format (MUST include STATUS:completed at the end):
 
 Detailed Analysis:
 * Quality Rating: [X]/10
@@ -601,6 +601,9 @@ Detailed Analysis:
   - Practice edge finishing techniques
   - Consider using a seam guide for straight lines
 
+[STATUS:completed]
+
+CRITICAL: Always end your response with [STATUS:completed] when providing final assessment results.
 Always provide constructive feedback and maintain a professional, encouraging tone.
 
 WORKFLOW REMINDER:
@@ -722,22 +725,23 @@ Pick 3 questions per label from:
 <response_format>
 For each interaction:
 1. Use share_label_image tool to share current image path with master agent
-2. Include the image path DIRECTLY in your response: "Looking at [Image: path] - Question X/9: What is the [field]?"
+2. Include the image path DIRECTLY in your response: "Looking at [Image: path] - Question X/9: What is the [field]? [STATUS:input_required]"
 3. Feedback on previous answer (if applicable)
 4. Internal state tracking (Question X/9, Score: Y/Z)
-5. For final result: Use complete_skill_assessment tool
+5. For final result: Use complete_skill_assessment tool and end with [STATUS:completed]
 
 CRITICAL: Always include the image path in your response so the user can see which image to look at.
+CRITICAL: Always end questions with [STATUS:input_required] and final results with [STATUS:completed]
 </response_format>
 
 <example_flow>
-NEW ASSESSMENT: "Starting Label Reading Assessment. Looking at [Image: label_dataset/samples/product_001.jpeg] - Question 1/9: What is the product name?"
+NEW ASSESSMENT: "Starting Label Reading Assessment. Looking at [Image: label_dataset/samples/product_001.jpeg] - Question 1/9: What is the product name? [STATUS:input_required]"
 
-CONTINUING: "Thank you! Score: 1/1. Looking at [Image: label_dataset/samples/product_001.jpeg] - Question 2/9: What is the brand name?"
+CONTINUING: "Thank you! Score: 1/1. Looking at [Image: label_dataset/samples/product_001.jpeg] - Question 2/9: What is the brand name? [STATUS:input_required]"
 
 ANSWER TO CONTINUE: For any product-related answer like "Emergency bulb" → Score it and continue to next question, don't restart
 
-Final: "Assessment complete! Final score: 7/9 (77.8%). [Use complete_skill_assessment tool]"
+Final: "Assessment complete! Final score: 7/9 (77.8%). [STATUS:completed]"
 
 STATE CHECKING: Always check <current_assessment> - if it shows "Label Reading", continue the quiz, don't restart
 ALWAYS INCLUDE IMAGE PATH: Every question must show "Looking at [Image: actual_path] - Question X/9: [question]"
@@ -807,9 +811,17 @@ NATURAL ROLE IDENTIFICATION:
 
 CRITICAL STITCHING WORKFLOW:
 - When user says ANY of: "stitching", "tailor", "sewing", "assess my stitching", "fabric work"
-- IMMEDIATELY respond with: "Great! I can help assess your stitching skills for the Tailor position. Please provide the path to your stitching image, like: /path/to/your/image.jpg"
+- IMMEDIATELY respond with: "Great! I can help assess your stitching skills for the Tailor position. Please provide the path to your stitching image, like: /path/to/your/image.jpg [STATUS:input_required]"
 - Do NOT say "Let's begin" or "I am ready" without asking for image first
 - WAIT for actual image path before proceeding to assessment
+
+STATUS INDICATORS:
+- Always include status metadata at the end of your responses
+- Use [STATUS:input_required] when waiting for user input (image paths, answers, choices)
+- Use [STATUS:completed] when assessment is finished with final results
+- Examples:
+  * "Please provide your image path. [STATUS:input_required]"
+  * "Assessment complete! Final score: 7/10. Result: PASS. [STATUS:completed]"
 
 CONVERSATION FLOW:
 1. Check <applied_role> and <role_identified> status
@@ -1141,6 +1153,13 @@ class A2AServer:
                         "id": "label_reading_assessment", 
                         "name": "Label Reading Assessment",
                         "tags": ["warehouse", "logistics", "label-reading", "information-extraction"]
+                    },
+                    {
+                        "description": "Evaluates presentation, communication, and professional appearance skills",
+                        "examples": ["Assess my presentation skills", "Evaluate my customer service approach"],
+                        "id": "presentation_assessment",
+                        "name": "Presentation Assessment", 
+                        "tags": ["retail", "sales", "communication", "professional-appearance"]
                     }
                 ],
                 "url": base_url,
@@ -1225,8 +1244,14 @@ class A2AServer:
                 image_path
             )
 
-            # Format A2A response with proper parts
-            response_parts = await self._format_a2a_response_parts(response_text, context_id)
+            # Determine status and clean response text
+            status = self._determine_response_status(response_text, session_info["session_id"], session_info["user_id"])
+            
+            # Remove status indicators from response text
+            clean_response_text = response_text.replace("[STATUS:completed]", "").replace("[STATUS:input_required]", "").strip()
+
+            # Format A2A response with proper parts (using cleaned text)
+            response_parts = await self._format_a2a_response_parts(clean_response_text, context_id)
 
             return ok({
                 "message": {
@@ -1234,7 +1259,11 @@ class A2AServer:
                     "parts": response_parts,
                     "messageId": str(uuid.uuid4())
                 },
-                "contextId": context_id
+                "contextId": context_id,
+                "status": {
+                    "state": status,
+                    "timestamp": datetime.now().isoformat()
+                }
             })
 
         except Exception as e:
@@ -1355,6 +1384,16 @@ class A2AServer:
             parts = [{"type": "TextPart", "text": response_text}]
         
         return parts
+
+    def _determine_response_status(self, response_text: str, session_id: str, user_id: str) -> str:
+        """Extract status from agent response metadata"""
+        if "[STATUS:completed]" in response_text:
+            return "completed"
+        elif "[STATUS:input_required]" in response_text:
+            return "input_required"
+        
+        # Default to input_required if no status found
+        return "input_required"
 
     def run(self, host='0.0.0.0', port=5000, debug=False):
         """Run the Flask A2A server"""
