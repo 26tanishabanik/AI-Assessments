@@ -1118,7 +1118,7 @@ class A2AServer:
         @self.app.route('/.well-known/agent-card.json', methods=['GET'])
         def a2a_agent_card():
             """Return A2A Agent Card according to A2A protocol specification"""
-            base_url = request.url_root.rstrip('/')
+            base_url = request.url_root.rstrip('/') + "/a2a/rpc"
             card = {
                 "capabilities": {
                     "pushNotifications": False,
